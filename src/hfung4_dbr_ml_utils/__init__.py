@@ -32,8 +32,8 @@ def get_version() -> str:
         return importlib.metadata.version(__package__)
     except importlib.metadata.PackageNotFoundError:
         # If not installed, read from the version.txt file
-        with importlib.resources.files(__package__).joinpath("../../version.txt").open("r", encoding="utf-8") as file:
-            return file.read().strip()
+        version_file = PROJECT_DIR / "version.txt"
+        return version_file.read_text(encoding="utf-8").strip()
 
 
 __version__ = get_version()
