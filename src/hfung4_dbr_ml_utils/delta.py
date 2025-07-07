@@ -36,8 +36,11 @@ def get_delta_table_version(
         # Get the Delta table
         delta_table = DeltaTable.forName(spark, full_table_name)
         # Get the version of the Delta table
-        version = delta_table.history().select("version").first()[0]
-        return version
+        version_row = delta_table.history().select("version").first()
+        if version_row is None:
+            print(f"No version history found for table: {full_table_name}")
+            return None
+        return version_row[0]
 
     except (ValueError, RuntimeError) as e:
         print(f"Error retrieving Delta table version: {e}")
