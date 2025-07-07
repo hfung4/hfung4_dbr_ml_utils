@@ -1,0 +1,113 @@
+# This is a Databricks asset bundle definition for ds_next_best_action_dl3.
+# See https://docs.databricks.com/dev-tools/bundles/index.html for documentation.
+
+bundle:
+  name: hfung4-dbr-ml-utils
+
+# Artifact configuration - defines how the Python package is built and deployed
+artifacts:
+  default:
+    type: whl # Build type: Python wheel package
+    build: uv build # Build command using uv package manager
+    path: . # Path to source code (current directory)
+
+# Variables - reusable configuration values that can be overridden by targets
+variables:
+
+  default_job_cluster:
+    description: The default cluster specification for the Databricks job
+    type: complex # Complex type allows nested configuration objects
+    default:
+      spark_version: "15.4.x-scala2.12" # Databricks runtime version
+      data_security_mode: "SINGLE_USER" # Security mode for the cluster
+      node_type_id: "Standard_DS3_v2"
+      driver_node_type_id: "Standard_DS3_v2"
+      autoscale: # Auto-scaling configuration
+        min_workers: 1 # Minimum number of worker nodes
+        max_workers: 1 # Maximum number of worker nodes
+
+  repo:
+    description: repo name
+    default: repo # Default repo name,to be overridden by CI/CD pipeline
+
+  branch:
+    description: git branch for tracking purposes, provided by GitHub in the CI CD workflow
+    default: main # Default branch name, to be overridden by CI/CD pipeline
+
+  git_sha:
+    description: git_sha
+    default: abcd # Default git SHA, to be overridden by CI/CD pipeline
+
+  org:
+    description: GitHub organization
+    default: hfung4
+
+  schedule_pause_status:
+    description: schedule pause status
+    default: PAUSED
+
+  env:
+    description: target environment of the bundle
+    default: dev # Environment name (dev, staging, prod)
+
+  is_test:
+    description: 1 if this is a test run, 0 if this is a production run
+    default: 0
+
+
+# Targets - environment-specific configurations that override default values
+targets:
+
+  # Development environment - for individual developer testing
+  dev:
+    cluster_id: 0523-152121-i2363kud # replace with my own interactive cluster ID
+    default: true # This is the default target, used if no target is specified
+    mode: development
+    workspace:
+      host: https://adb-2972378804555913.13.azuredatabricks.net # dev workspace
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.target}/${bundle.name} # User-specific workspace path
+    variables:
+      schedule_pause_status: PAUSED # Jobs don't run automatically in dev
+      is_test: 0 # Not in test mode
+      env: dev # Environment identifier to be used as input argument to scripts (job tasks)
+    artifacts:
+      default:
+        type: whl
+        build: uv build
+        path: .
+        dynamic_version: True # Use dynamic versioning for development builds
+
+  # Test environment - for automated CI/CD testing (use dev workspace and catalog, Databricks workflow has "test_" prefix)
+  test:
+    presets:
+      name_prefix: 'test_' # Prefix all resource names with "test_"
+    workspace:
+      host: https://adb-2972378804555913.13.azuredatabricks.net # dev workspace for testing
+      root_path: /Shared/.bundle/${bundle.target}/${bundle.name} # Shared workspace path for the bundle if we are in test mode
+    variables:
+      schedule_pause_status: PAUSED # Jobs don't run automatically in test
+      is_test: 1 # In test mode
+      env: dev # Environment identifier to be used as input argument to scripts (job tasks), read/write to tables/models/serving endpoints in dev catalog
+
+  # Staging environment - for pre-production validation
+  staging:
+    presets:
+      name_prefix: 'staging_'
+    workspace:
+      host: https://adb-2783247814602501.1.azuredatabricks.net # staging workspace
+      root_path: /Shared/.bundle/${bundle.target}/${bundle.name}
+    variables:
+      schedule_pause_status: PAUSED # Jobs don't run automatically in staging
+      is_test: 1 # In test mode
+      env: staging # Environment identifier to be used as input argument to scripts (job tasks), read/write to tables/models/serving endpoints in staging catalog
+
+  # Production environment - for live deployment
+  prod:
+    mode: production
+    workspace:
+      host: https://adb-1080647027516230.10.azuredatabricks.net
+      root_path: /Shared/.bundle/${bundle.target}/${bundle.name}
+    variables:
+      schedule_pause_status: PAUSED # normally UNPAUSED since production jobs should run automatically
+      is_test: 0
+      env: prod # Environment identifier to be used as input argument to scripts (job tasks), read/write to tables/models/serving endpoints in prod catalog
